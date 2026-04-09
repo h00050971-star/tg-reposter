@@ -1,0 +1,36 @@
+name: Обработчик команд
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # каждые 5 минут
+  workflow_dispatch:
+
+jobs:
+  reply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install requests
+
+      - run: python reply_handler.py
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+
+      - name: Сохранить offset
+        run: |
+          git config user.name "reposter-bot"
+          git config user.email "bot@noreply.github.com"
+          git add last_update_id.txt posts_cache.json || true
+          git diff --staged --quiet || git commit -m "update offset"
+          git push

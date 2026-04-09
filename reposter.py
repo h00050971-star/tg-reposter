@@ -99,6 +99,17 @@ def send_telegram(text: str, preview_url: str = None) -> bool:
         return json.loads(resp.read()).get("ok", False)
 
 
+MONTHS_RU = {
+    1: "января", 2: "февраля", 3: "марта", 4: "апреля",
+    5: "мая", 6: "июня", 7: "июля", 8: "августа",
+    9: "сентября", 10: "октября", 11: "ноября", 12: "декабря"
+}
+
+def format_date_ru(iso_date: str) -> str:
+    dt = datetime.fromisoformat(iso_date).astimezone(timezone(timedelta(hours=3)))
+    return f"{dt.day} {MONTHS_RU[dt.month]} {dt.year}"
+
+
 def main():
     print(f"Парсю последние {HOURS_BACK} часов...")
     all_posts = []
@@ -115,29 +126,31 @@ def main():
         print("Новых постов нет.")
         return
 
-    # Сортируем по времени
+    # Сортируем по времени, нумеруем
     all_posts.sort(key=lambda x: x["date"])
-
-    # Нумеруем и сохраняем в кэш
-    cache = []
     for i, post in enumerate(all_posts, 1):
         post["num"] = i
-        cache.append(post)
 
+    # Сохраняем кэш
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(cache, f, ensure_ascii=False, indent=2)
-    print(f"Сохранено {len(cache)} постов в {CACHE_FILE.name}")
+        json.dump(all_posts, f, ensure_ascii=False, indent=2)
+    print(f"Сохранено {len(all_posts)} постов в {CACHE_FILE.name}")
 
-    # Отправляем в канал пачкой-оглавлением
-    lines = ["📋 <b>Посты за последние 10 часов</b>\n"]
-    for post in cache:
-        text_preview = post["text"][:80].replace("<", "&lt;").replace(">", "&gt;")
-        if len(post["text"]) > 80:
-            text_preview += "..."
-        lines.append(f'<b>{post["num"]}.</b> {post["channel"]} — {text_preview} <a href="{post["url"]}">→</a>')
+    # Отправляем каждый пост отдельным сообщением
+    sent = 0
+    for post in all_posts:
+        date_str = format_date_ru(post["date"])
+        header = f"{post['num']} за {date_str}"
+        text_safe = post["text"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        message = f"{header}\n\n{text_safe}\n\n<a href=\"{post['url']}\">→ {post['channel']}</a>"
 
-    ok = send_telegram("\n\n".join(lines))
-    print(f"Оглавление отправлено: {'OK' if ok else 'FAIL'}")
+        ok = send_telegram(message, post["url"])
+        print(f"  [{post['num']}] {post['channel']}: {'OK' if ok else 'FAIL'}")
+        if ok:
+            sent += 1
+        time.sleep(0.5)
+
+    print(f"Отправлено: {sent}/{len(all_posts)}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,15 @@
+{
+  "telegram": {
+    "bot_token": "8744576713:AAFuvJ9vay9-G0rGChUeVokGs_BSaTDKQCM",
+    "channel_id": "-1002002451658",
+    "channel_username": "@karlstein_abbey"
+  },
+  "apify": {
+    "actor": "webfinity/telegram-channel-content-media-scraper-v2"
+  },
+  "channels_to_monitor": [
+    "popsmarketing",
+    "collegi",
+    "costperlead"
+  ]
+}

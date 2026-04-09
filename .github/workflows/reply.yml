@@ -2,7 +2,7 @@ name: Обработчик команд
 
 on:
   schedule:
-    - cron: '*/5 * * * *'   # каждые 5 минут
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -22,15 +22,28 @@ jobs:
 
       - run: pip install requests
 
-      - run: python reply_handler.py
+      - name: Кэш модели Ollama
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama/models
+          key: ollama-llama3.2-1b-v1
+
+      - name: Установить Ollama и загрузить модель
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve &
+          sleep 5
+          ollama pull llama3.2:1b
+
+      - name: Запустить обработчик
+        run: python reply_handler.py
         env:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          GH_PAT: ${{ secrets.GH_PAT }}
 
       - name: Сохранить offset
         run: |
           git config user.name "reposter-bot"
           git config user.email "bot@noreply.github.com"
-          git add last_update_id.txt posts_cache.json || true
+          git add last_update_id.txt || true
           git diff --staged --quiet || git commit -m "update offset"
           git push

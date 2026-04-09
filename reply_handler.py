@@ -15,7 +15,6 @@ import requests
 # ─── КОНФИГ ────────────────────────────────────────────────
 TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "8744576713:AAFuvJ9vay9-G0rGChUeVokGs_BSaTDKQCM")
 TG_CHAT_ID   = "-1002002451658"
-GH_PAT       = os.environ.get("GH_PAT", "")
 CACHE_FILE   = Path(__file__).parent / "posts_cache.json"
 OFFSET_FILE  = Path(__file__).parent / "last_update_id.txt"
 # ────────────────────────────────────────────────────────────
@@ -62,28 +61,25 @@ def delete_message(message_id: int):
         pass
 
 
-def rewrite_with_github_models(post: dict) -> str:
+def rewrite_with_ollama(post: dict) -> str:
     payload = {
-        "model": "gpt-4o-mini",
+        "model": "llama3.2:1b",
         "messages": [
             {"role": "system", "content": STYLE_PROMPT},
             {"role": "user", "content": f"Новость из {post['channel']}:\n{post['text']}\n\nСсылка: {post['url']}"}
         ],
-        "max_tokens": 300,
-        "temperature": 0.8
+        "stream": False,
+        "options": {"temperature": 0.8, "num_predict": 300}
     }
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        "https://models.inference.ai.azure.com/chat/completions",
+        "http://localhost:11434/api/chat",
         data=data,
-        headers={
-            "Authorization": f"Bearer {GH_PAT}",
-            "Content-Type": "application/json"
-        }
+        headers={"Content-Type": "application/json"}
     )
-    with urllib.request.urlopen(req, timeout=30) as r:
+    with urllib.request.urlopen(req, timeout=60) as r:
         result = json.loads(r.read())
-        return result["choices"][0]["message"]["content"].strip()
+        return result["message"]["content"].strip()
 
 
 def send_rewrite(text: str, preview_url: str):
@@ -156,7 +152,7 @@ def main():
 
         print(f"  Переписываю пост #{num} из {post['channel']}...")
         try:
-            rewritten = rewrite_with_github_models(post)
+            rewritten = rewrite_with_ollama(post)
             delete_message(message_id)
             send_rewrite(rewritten, post["url"])
             print(f"  #{num} отправлен.")

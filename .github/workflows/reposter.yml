@@ -1,0 +1,33 @@
+name: ТГ Репостер
+
+on:
+  schedule:
+    - cron: '0 7 * * *'  # 10:00 MSK каждый день
+  workflow_dispatch:      # ручной запуск из GitHub
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write     # чтобы коммитить posts_cache.json
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install requests
+
+      - run: python reposter.py
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+
+      - name: Сохранить posts_cache.json в репо
+        run: |
+          git config user.name "reposter-bot"
+          git config user.email "bot@noreply.github.com"
+          git add posts_cache.json
+          git diff --staged --quiet || git commit -m "update posts cache $(date -u +%Y-%m-%dT%H:%M)"
+          git push
